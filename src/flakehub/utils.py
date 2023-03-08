@@ -2,14 +2,18 @@ import hashlib
 import io
 import itertools
 import json
+import logging
 import os
 import pathlib
-import sys
+import subprocess
 import tarfile
 from datetime import datetime
 from typing import Dict, Tuple
 
+logger = logging.getLogger(__name__)
 
+
+# src: https://github.com/NixOS/nixpkgs/blob/a36fdb523f401b4036e836374fd3d6dab0880f88/pkgs/build-support/docker/stream_layered_image.py#L48
 def archive_paths_to(obj, paths, mtime):
     """
     Writes the given store paths as a tar file to the given stream.
@@ -71,6 +75,7 @@ def archive_paths_to(obj, paths, mtime):
                     tar.addfile(ti)
 
 
+# src: https://github.com/NixOS/nixpkgs/blob/a36fdb523f401b4036e836374fd3d6dab0880f88/pkgs/build-support/docker/stream_layered_image.py#L48
 class ExtractChecksum:
     """
     A writable stream which only calculates the final file size and
@@ -105,7 +110,7 @@ def get_manifest(
     mtime = int(datetime.fromisoformat(conf["created"]).timestamp())
 
     for num, store_layer in enumerate(conf["store_layers"]):
-        print("Creating layer", num, "from paths:", store_layer, file=sys.stderr)
+        logger.debug("Creating layer %s from paths: %s", num, store_layer)
 
         # First, calculate the tarball checksum and the size.
         extract_checksum = ExtractChecksum()
@@ -115,11 +120,9 @@ def get_manifest(
             mtime=mtime,
         )
         (checksum, size) = extract_checksum.extract()
-        print("Checksum:", checksum, file=sys.stderr)
-        print("Size:", size, file=sys.stderr)
+        logger.debug("Checksum: %s, size: %s", checksum, size)
 
         path = store_layer[0]
-        print(path)
         layers.append(
             {
                 "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
@@ -137,9 +140,12 @@ def get_manifest(
         os.path.join(conf["customisation_layer"], "layer.tar")
     )
 
-    print("Customisation layer:", conf["customisation_layer"], file=sys.stderr)
-    print("Customisation layer checksum:", checksum, file=sys.stderr)
-    print("Customisation layer size:", customisation_layer_size, file=sys.stderr)
+    logger.debug(
+        "Customisation layer: %s (size: %s, checksum: %s)",
+        conf["customisation_layer"],
+        customisation_layer_size,
+        checksum,
+    )
 
     layers.append(
         {
@@ -194,3 +200,29 @@ def get_store_layer_tar(store_path: str, mtime: int) -> io.BytesIO:
     archive_paths_to(buffer, [store_path], mtime=mtime)
     buffer.seek(0)
     return buffer
+
+
+class BuildImageError(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+def build_conf(flakeroot: str, image: str) -> str:
+    logger.debug("Building image %s", image)
+
+    cmd = ["nix", "build", "--no-link", "--print-out-paths", f"{flakeroot}#{image}"]
+    logger.debug("Running command: %s", " ".join(cmd))
+
+    with subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    ) as proc:
+        stdout, stderr = proc.communicate()
+        if proc.returncode != 0:
+            raise BuildImageError(f"Error building image {image}: {stderr}")
+        nix_path = stdout.strip()
+
+    logger.debug("Nix path: %s", nix_path)
+    return nix_path

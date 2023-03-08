@@ -1,0 +1,1 @@
+from .flakehub import cli

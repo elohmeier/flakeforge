@@ -26,6 +26,8 @@
           flakehub = pkgs.flakehub;
           flakehubTools = pkgs.flakehubTools;
         };
+
+        defaultPackage = pkgs.flakehub;
       }) // {
       nixosModules = rec {
         flakehub = import ./nixos;

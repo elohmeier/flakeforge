@@ -30,7 +30,7 @@
         defaultPackage = pkgs.flakehub;
       }) // {
       nixosModules = rec {
-        flakehub = import ./nixos;
+        flakehub = import ./nixos { inherit (self) overlay; };
         default = flakehub;
       };
 

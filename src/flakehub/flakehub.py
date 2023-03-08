@@ -4,20 +4,20 @@ import os
 
 import uvicorn
 from starlette.applications import Starlette
-from starlette.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from flakehub.utils import (
     BuildImageError,
     build_conf,
     get_manifest,
-    get_store_layer_tar,
+    get_store_layer_tar_path,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def server(flakeroot, debug):
+def server(flakeroot, debug, cache_dir):
     cache = {}
 
     async def v2(_):
@@ -91,9 +91,8 @@ def server(flakeroot, debug):
                 config_data, media_type="application/vnd.docker.container.image.v1+json"
             )
         elif media_type == "store_layer":
-            return StreamingResponse(
-                get_store_layer_tar(res, mtime), media_type="application/x-tar"
-            )
+            cached_path = get_store_layer_tar_path(cache_dir, digest, res, mtime)
+            return FileResponse(cached_path, media_type="application/x-tar")
         elif media_type == "customisation_layer":
             tar_path = os.path.join(res, "layer.tar")
             return FileResponse(tar_path, media_type="application/x-tar")
@@ -131,10 +130,16 @@ def cli():
         action="store_true",
         help="Enable debug mode",
     )
+    parser.add_argument(
+        "--cache-dir",
+        "-c",
+        default="/tmp/flakehub",
+        help="Cache directory (default: /tmp/flakehub)",
+    )
     parser.add_argument("flakeroot", help="Path to the flake root")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
-    app = server(args.flakeroot, args.debug)
+    app = server(args.flakeroot, args.debug, args.cache_dir)
     uvicorn.run(app, host=args.host, port=args.port)  # type: ignore

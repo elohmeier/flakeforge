@@ -2,7 +2,7 @@
 
 Generate container images using [Nix](https://nixos.org) and serve them via an [Docker Registry HTTP API V2](https://docs.docker.com/registry/spec/api/) compatible HTTP API.
 
-Container image tarballs are generated on the fly and not stored in the Nix store to save disk space.
+Container image tarballs are generated on the fly and cached by flakehub (but not stored in the Nix store to save disk space).
 
 
 ## How to use
@@ -49,6 +49,7 @@ Currently this is in a proof of concept state. I'm using it in a Kubernetes clus
 - no tag support (not handled, always returns the same image by package name)
 - no HTTPS support
 - minimal registry API implementation (manifest & digest endpoints only)
+- no compression (only tar images)
 
 
 ## Acknowledgements

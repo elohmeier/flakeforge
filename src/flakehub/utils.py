@@ -122,7 +122,6 @@ def get_manifest(
         (checksum, size) = extract_checksum.extract()
         logger.debug("Checksum: %s, size: %s", checksum, size)
 
-        path = store_layer[0]
         layers.append(
             {
                 "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
@@ -130,7 +129,7 @@ def get_manifest(
                 "digest": f"sha256:{checksum}",
             }
         )
-        digest_map[checksum] = (path, "store_layer", mtime)
+        digest_map[checksum] = (store_layer, "store_layer", mtime)
 
     checksum_path = os.path.join(conf["customisation_layer"], "checksum")
     with open(checksum_path) as f:
@@ -195,11 +194,24 @@ def get_manifest(
     )
 
 
-def get_store_layer_tar(store_path: str, mtime: int) -> io.BytesIO:
-    buffer = io.BytesIO()
-    archive_paths_to(buffer, [store_path], mtime=mtime)
-    buffer.seek(0)
-    return buffer
+def get_store_layer_tar_path(
+    cache_dir: str, digest: str, paths: str, mtime: int
+) -> str:
+
+    digest_path = os.path.join(cache_dir, digest, "layer.tar")
+
+    if not os.path.exists(os.path.join(cache_dir, digest)):
+        os.makedirs(os.path.join(cache_dir, digest))
+
+    if os.path.exists(digest_path):
+        logger.debug("Layer already exists: %s", digest)
+        return digest_path
+
+    logger.debug("Creating layer: %s", digest)
+    with open(digest_path, "wb") as f:
+        archive_paths_to(f, paths, mtime=mtime)
+
+    return digest_path
 
 
 class BuildImageError(Exception):
@@ -208,9 +220,17 @@ class BuildImageError(Exception):
 
 
 def build_conf(flakeroot: str, image: str) -> str:
-    logger.debug("Building image %s", image)
+    logger.info("Building image %s", image)
 
-    cmd = ["nix", "build", "--no-link", "--print-out-paths", f"{flakeroot}#{image}"]
+    cmd = [
+        "nix",
+        "build",
+        "--no-link",
+        "--print-out-paths",
+        "--extra-experimental-features",
+        "nix-command flakes",
+        f"{flakeroot}#{image}",
+    ]
     logger.debug("Running command: %s", " ".join(cmd))
 
     with subprocess.Popen(
@@ -221,6 +241,7 @@ def build_conf(flakeroot: str, image: str) -> str:
     ) as proc:
         stdout, stderr = proc.communicate()
         if proc.returncode != 0:
+            logger.error("Error building image %s: %s", image, stderr)
             raise BuildImageError(f"Error building image {image}: {stderr}")
         nix_path = stdout.strip()
 

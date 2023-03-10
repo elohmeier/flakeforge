@@ -1,6 +1,8 @@
 import argparse
 import logging
 import os
+import time
+from functools import lru_cache
 
 import uvicorn
 from starlette.applications import Starlette
@@ -18,7 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 def server(flakeroot, debug, cache_dir):
-    cache = {}
+    @lru_cache()
+    def _get_manifest(image, ttl_hash=None):
+        del ttl_hash
+        return get_manifest(build_conf(flakeroot, image))
+
+    def _get_ttl_hash(seconds=10):
+        return round(time.time() / seconds)
 
     async def v2(_):
         return JSONResponse({})
@@ -30,26 +38,23 @@ def server(flakeroot, debug, cache_dir):
         tag = request.path_params["tag"]
         logger.debug("image: %s, tag: %s", image, tag)
 
-        if image not in cache:
-            try:
-                conf_path = build_conf(flakeroot, image)
-            except BuildImageError as e:
-                return JSONResponse(
-                    content={
-                        "errors": [
-                            {
-                                "code": "MANIFEST_UNKNOWN",
-                                "message": str(e),
-                                "detail": {
-                                    "Tag": tag,
-                                },
-                            }
-                        ]
-                    },
-                    status_code=404,
-                )
-            cache[image] = get_manifest(conf_path)
-        _, manifest, _ = cache[image]
+        try:
+            _, manifest, _ = _get_manifest(image, _get_ttl_hash())
+        except BuildImageError as e:
+            return JSONResponse(
+                content={
+                    "errors": [
+                        {
+                            "code": "MANIFEST_UNKNOWN",
+                            "message": str(e),
+                            "detail": {
+                                "Tag": tag,
+                            },
+                        }
+                    ]
+                },
+                status_code=404,
+            )
 
         return JSONResponse(
             manifest,
@@ -62,26 +67,23 @@ def server(flakeroot, debug, cache_dir):
 
         logger.debug("image: %s, digest: %s", image, digest)
 
-        if image not in cache:
-            try:
-                conf_path = build_conf(flakeroot, image)
-            except BuildImageError as e:
-                return JSONResponse(
-                    content={
-                        "errors": [
-                            {
-                                "code": "MANIFEST_UNKNOWN",
-                                "message": str(e),
-                                "detail": {
-                                    "Digest": digest,
-                                },
-                            }
-                        ]
-                    },
-                    status_code=404,
-                )
-            cache[image] = get_manifest(conf_path)
-        digest_map, _, config_data = cache[image]
+        try:
+            digest_map, _, config_data = _get_manifest(image, _get_ttl_hash())
+        except BuildImageError as e:
+            return JSONResponse(
+                content={
+                    "errors": [
+                        {
+                            "code": "MANIFEST_UNKNOWN",
+                            "message": str(e),
+                            "detail": {
+                                "Digest": digest,
+                            },
+                        }
+                    ]
+                },
+                status_code=404,
+            )
 
         res, media_type, mtime = digest_map[digest]
         logger.debug("res: %s, media_type: %s, mtime: %s", res, media_type, mtime)

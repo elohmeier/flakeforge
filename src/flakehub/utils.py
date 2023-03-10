@@ -1,5 +1,4 @@
 import hashlib
-import io
 import itertools
 import json
 import logging
@@ -97,6 +96,9 @@ class ExtractChecksum:
         return (self._digest.hexdigest(), self._size)
 
 
+store_layer_cache = {}
+
+
 def get_manifest(
     nixConfPath: str,
 ) -> Tuple[Dict[str, Tuple[str, str, int]], Dict, bytes]:
@@ -110,17 +112,24 @@ def get_manifest(
     mtime = int(datetime.fromisoformat(conf["created"]).timestamp())
 
     for num, store_layer in enumerate(conf["store_layers"]):
-        logger.debug("Creating layer %s from paths: %s", num, store_layer)
+        cache_key = "|".join(store_layer)
+        if cache_key in store_layer_cache:
+            logger.debug("Using cached store layer %s", store_layer)
+            (checksum, size) = store_layer_cache[cache_key]
+        else:
+            logger.debug("Creating layer %s from paths: %s", num, store_layer)
 
-        # First, calculate the tarball checksum and the size.
-        extract_checksum = ExtractChecksum()
-        archive_paths_to(
-            extract_checksum,
-            store_layer,
-            mtime=mtime,
-        )
-        (checksum, size) = extract_checksum.extract()
-        logger.debug("Checksum: %s, size: %s", checksum, size)
+            # First, calculate the tarball checksum and the size.
+            extract_checksum = ExtractChecksum()
+            archive_paths_to(
+                extract_checksum,
+                store_layer,
+                mtime=mtime,
+            )
+            (checksum, size) = extract_checksum.extract()
+            logger.debug("Checksum: %s, size: %s", checksum, size)
+
+            store_layer_cache[cache_key] = (checksum, size)
 
         layers.append(
             {

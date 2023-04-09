@@ -1,0 +1,18 @@
+[formatter.black]
+command = "black"
+includes = ["*.py"]
+
+[formatter.isort]
+command = "isort"
+options = ["--profile", "black"]
+includes = ["*.py"]
+
+[formatter.nixpkgs-fmt]
+command = "nixpkgs-fmt"
+includes = ["*.nix"]
+
+[formatter.prettier]
+command = "prettier"
+options = ["--write"]
+includes = ["*.md"]
+

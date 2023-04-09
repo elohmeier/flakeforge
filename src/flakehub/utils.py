@@ -6,8 +6,9 @@ import os
 import pathlib
 import subprocess
 import tarfile
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +100,17 @@ class ExtractChecksum:
 store_layer_cache = {}
 
 
+@dataclass
+class Digest:
+    response: str
+    media_type: str
+    mtime: int
+    data: Optional[bytes] = None
+
+
 def get_manifest(
     nixConfPath: str,
-) -> Tuple[Dict[str, Tuple[str, str, int]], Dict, bytes]:
+) -> Tuple[Dict[str, Digest], bytes]:
 
     digest_map = {}
     layers = []
@@ -138,7 +147,7 @@ def get_manifest(
                 "digest": f"sha256:{checksum}",
             }
         )
-        digest_map[checksum] = (store_layer, "store_layer", mtime)
+        digest_map[checksum] = Digest(store_layer, "store_layer", mtime)
 
     checksum_path = os.path.join(conf["customisation_layer"], "checksum")
     with open(checksum_path) as f:
@@ -162,7 +171,9 @@ def get_manifest(
             "digest": f"sha256:{checksum}",
         }
     )
-    digest_map[checksum] = (conf["customisation_layer"], "customisation_layer", mtime)
+    digest_map[checksum] = Digest(
+        conf["customisation_layer"], "customisation_layer", mtime
+    )
 
     config = {
         "created": datetime.fromisoformat(conf["created"]).isoformat(),
@@ -176,31 +187,31 @@ def get_manifest(
         "history": [
             {
                 "created": datetime.fromisoformat(conf["created"]).isoformat(),
-                "comment": "store path: {}".format(path),
+                "comment": "store path: {}".format(dig.response),
             }
-            for path, _, _ in digest_map.values()
+            for dig in digest_map.values()
         ],
     }
 
     config_data = json.dumps(config).encode("utf-8")
     config_checksum = hashlib.sha256(config_data).hexdigest()
+    digest_map[config_checksum] = Digest("data", "config", mtime, config_data)
 
-    digest_map[config_checksum] = ("config", "config", mtime)
-
-    return (
-        digest_map,
-        {
-            "schemaVersion": 2,
-            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-            "config": {
-                "mediaType": "application/vnd.docker.container.image.v1+json",
-                "size": len(config_data),
-                "digest": f"sha256:{config_checksum}",
-            },
-            "layers": layers,
+    manifest = {
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+        "config": {
+            "mediaType": "application/vnd.docker.container.image.v1+json",
+            "size": len(config_data),
+            "digest": f"sha256:{config_checksum}",
         },
-        config_data,
-    )
+        "layers": layers,
+    }
+    manifest_data = json.dumps(manifest).encode("utf-8")
+    manifest_checksum = hashlib.sha256(manifest_data).hexdigest()
+    digest_map[manifest_checksum] = Digest("data", "manifest", mtime, manifest_data)
+
+    return digest_map, manifest_data
 
 
 def get_store_layer_tar_path(
@@ -228,8 +239,10 @@ class BuildImageError(Exception):
         super().__init__(message)
 
 
-def build_conf(flakeroot: str, image: str) -> str:
-    logger.info("Building image %s", image)
+def build_conf(flakeroot: str, image: str, tag: str) -> str:
+    logger.info("Building %s:%s", image, tag)
+
+    path = "" if tag == "latest" else f"/{tag}"
 
     cmd = [
         "nix",
@@ -238,7 +251,7 @@ def build_conf(flakeroot: str, image: str) -> str:
         "--print-out-paths",
         "--extra-experimental-features",
         "nix-command flakes",
-        f"{flakeroot}#{image}",
+        f"{flakeroot}{path}#{image}",
     ]
     logger.debug("Running command: %s", " ".join(cmd))
 

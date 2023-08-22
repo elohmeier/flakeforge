@@ -2,16 +2,16 @@
 
 with lib;
 let
-  cfg = config.services.flakehub;
+  cfg = config.services.flakeforge;
 in
 {
-  options.services.flakehub = {
-    enable = mkEnableOption "flakehub";
+  options.services.flakeforge = {
+    enable = mkEnableOption "flakeforge";
     package = mkOption {
       type = types.package;
-      default = pkgs.flakehub;
-      defaultText = "pkgs.flakehub";
-      description = "The flakehub package to use.";
+      default = pkgs.flakeforge;
+      defaultText = "pkgs.flakeforge";
+      description = "The flakeforge package to use.";
     };
     listenAddress = mkOption {
       type = types.str;
@@ -31,7 +31,7 @@ in
     extraFlags = mkOption {
       type = types.listOf types.str;
       default = [ ];
-      description = "Extra flags to pass to flakehub.";
+      description = "Extra flags to pass to flakeforge.";
     };
   };
 
@@ -39,24 +39,24 @@ in
 
     nixpkgs.overlays = [ overlay ];
 
-    systemd.services.flakehub = {
-      description = "flakehub";
+    systemd.services.flakeforge = {
+      description = "flakeforge";
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
       wants = [ "network.target" ];
 
       path = with pkgs; [ gitMinimal nixFlakes ];
       environment = {
-        HOME = "/var/lib/flakehub";
+        HOME = "/var/lib/flakeforge";
       };
 
       serviceConfig = {
-        ExecStart = "${cfg.package}/bin/flakehub --host ${cfg.listenAddress} --port ${toString cfg.listenPort} --cache-dir /var/cache/flakehub ${concatStringsSep " " cfg.extraFlags} ${cfg.flakeRoot}";
+        ExecStart = "${cfg.package}/bin/flakeforge --host ${cfg.listenAddress} --port ${toString cfg.listenPort} --cache-dir /var/cache/flakeforge ${concatStringsSep " " cfg.extraFlags} ${cfg.flakeRoot}";
         DynamicUser = true;
-        StateDirectory = "flakehub";
-        CacheDirectory = "flakehub";
+        StateDirectory = "flakeforge";
+        CacheDirectory = "flakeforge";
         Restart = "always";
-        WorkingDirectory = "/var/lib/flakehub";
+        WorkingDirectory = "/var/lib/flakeforge";
         PrivateTmp = true;
         PrivateDevices = true;
         ProtectSystem = "strict";

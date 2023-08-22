@@ -9,7 +9,7 @@ from starlette.applications import Starlette
 from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route
 
-from flakehub.utils import (
+from flakeforge.utils import (
     BuildImageError,
     build_conf,
     get_manifest,
@@ -159,8 +159,8 @@ def cli():
     parser.add_argument(
         "--cache-dir",
         "-c",
-        default="/tmp/flakehub",
-        help="Cache directory (default: /tmp/flakehub)",
+        default="/tmp/flakeforge",
+        help="Cache directory (default: /tmp/flakeforge)",
     )
     parser.add_argument("flakeroot", help="Path to the flake root")
     args = parser.parse_args()

@@ -1,5 +1,5 @@
 {
-  description = "flakehub";
+  description = "flakeforge";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
@@ -18,30 +18,30 @@
       in
       {
         packages = {
-          docker-image-stream = pkgs.flakehubTools.streamLayeredImageConf {
+          docker-image-stream = pkgs.flakeforgeTools.streamLayeredImageConf {
             name = "bash-stream-layered";
             contents = [ pkgs.bashInteractive ];
           };
 
-          flakehub = pkgs.flakehub;
-          flakehubTools = pkgs.flakehubTools;
+          flakeforge = pkgs.flakeforge;
+          flakeforgeTools = pkgs.flakeforgeTools;
         };
 
-        defaultPackage = pkgs.flakehub;
+        defaultPackage = pkgs.flakeforge;
       }) // {
       nixosModules = rec {
-        flakehub = import ./nixos { inherit (self) overlay; };
-        default = flakehub;
+        flakeforge = import ./nixos { inherit (self) overlay; };
+        default = flakeforge;
       };
 
       overlay = self: super: {
-        flakehub = with super.python3Packages; buildPythonApplication {
-          pname = "flakehub";
+        flakeforge = with super.python3Packages; buildPythonApplication {
+          pname = "flakeforge";
           version = "0.0.1";
           src = ./src;
           propagatedBuildInputs = [ starlette uvicorn ];
         };
-        flakehubTools = self.callPackage ./flakehub-tools { };
+        flakeforgeTools = self.callPackage ./flakeforge-tools { };
       };
     };
 }

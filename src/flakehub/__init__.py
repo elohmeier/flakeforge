@@ -1,1 +1,1 @@
-from .flakehub import cli
+from .flakeforge import cli

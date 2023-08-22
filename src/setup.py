@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name="flakehub",
+    name="flakeforge",
     version="0.0.1",
     description="Serve docker images from Nix flakes",
     author="Enno Richter <enno@nerdworks.de>",
@@ -12,7 +12,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "flakehub = flakehub:cli",
+            "flakeforge = flakeforge:cli",
         ]
     },
 )

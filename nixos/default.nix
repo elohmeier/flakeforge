@@ -1,4 +1,10 @@
-{ overlay }: { config, lib, pkgs, ... }:
+{ overlay }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 with lib;
 let
@@ -38,6 +44,7 @@ in
   config = mkIf cfg.enable {
 
     nixpkgs.overlays = [ overlay ];
+    nix.settings.trusted-users = [ "flakeforge" ];
 
     systemd.services.flakeforge = {
       description = "flakeforge";
@@ -45,7 +52,10 @@ in
       after = [ "network.target" ];
       wants = [ "network.target" ];
 
-      path = with pkgs; [ gitMinimal nixFlakes ];
+      path = with pkgs; [
+        gitMinimal
+        nixFlakes
+      ];
       environment = {
         HOME = "/var/lib/flakeforge";
       };

@@ -28,7 +28,7 @@
           };
 
           flakeforge = pkgs.flakeforge;
-          # flakeforgeTools = pkgs.flakeforgeTools;
+          flakeforgeTools = pkgs.flakeforgeTools;
         };
 
         defaultPackage = pkgs.flakeforge;

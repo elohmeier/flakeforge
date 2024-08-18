@@ -247,6 +247,7 @@ def build_conf(flakeroot: str, image: str, tag: str) -> str:
     cmd = [
         "nix",
         "build",
+        "--refresh",
         "--no-link",
         "--print-out-paths",
         "--extra-experimental-features",

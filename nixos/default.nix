@@ -1,10 +1,9 @@
-{ overlay }: { config, lib, pkgs, ... }:
+{ overlay }:
+{ config, lib, pkgs, ... }:
 
 with lib;
-let
-  cfg = config.services.flakeforge;
-in
-{
+let cfg = config.services.flakeforge;
+in {
   options.services.flakeforge = {
     enable = mkEnableOption "flakeforge";
     package = mkOption {
@@ -38,6 +37,7 @@ in
   config = mkIf cfg.enable {
 
     nixpkgs.overlays = [ overlay ];
+    nix.settings.trusted-users = [ "flakeforge" ];
 
     systemd.services.flakeforge = {
       description = "flakeforge";
@@ -45,13 +45,16 @@ in
       after = [ "network.target" ];
       wants = [ "network.target" ];
 
-      path = with pkgs; [ gitMinimal nixFlakes ];
-      environment = {
-        HOME = "/var/lib/flakeforge";
-      };
+      path = with pkgs; [ gitMinimal nixVersions.stable ];
+      environment = { HOME = "/var/lib/flakeforge"; };
 
       serviceConfig = {
-        ExecStart = "${cfg.package}/bin/flakeforge --host ${cfg.listenAddress} --port ${toString cfg.listenPort} --cache-dir /var/cache/flakeforge ${concatStringsSep " " cfg.extraFlags} ${cfg.flakeRoot}";
+        ExecStart =
+          "${cfg.package}/bin/flakeforge --host ${cfg.listenAddress} --port ${
+            toString cfg.listenPort
+          } --cache-dir /var/cache/flakeforge ${
+            concatStringsSep " " cfg.extraFlags
+          } ${cfg.flakeRoot}";
         DynamicUser = true;
         StateDirectory = "flakeforge";
         CacheDirectory = "flakeforge";

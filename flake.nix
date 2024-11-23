@@ -7,14 +7,18 @@
   };
 
   outputs =
-    { self
-    , flake-utils
-    , nixpkgs
+    {
+      self,
+      flake-utils,
+      nixpkgs,
     }:
-    flake-utils.lib.eachDefaultSystem
-      (system:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
-        pkgs = import nixpkgs { inherit system; overlays = [ self.overlay ]; };
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ self.overlay ];
+        };
       in
       {
         packages = {
@@ -28,20 +32,27 @@
         };
 
         defaultPackage = pkgs.flakeforge;
-      }) // {
+      }
+    )
+    // {
       nixosModules = rec {
         flakeforge = import ./nixos { inherit (self) overlay; };
         default = flakeforge;
       };
 
       overlay = self: super: {
-        flakeforge = with super.python3Packages; buildPythonApplication {
-          pname = "flakeforge";
-          version = "0.0.1";
-          src = ./src;
-          propagatedBuildInputs = [ starlette uvicorn ];
-        };
-        flakeforgeTools = self.callPackage ./flakeforge-tools { };
+        flakeforge =
+          with super.python3Packages;
+          buildPythonApplication {
+            pname = "flakeforge";
+            version = "0.0.1";
+            src = ./src;
+            propagatedBuildInputs = [
+              starlette
+              uvicorn
+            ];
+          };
+        flakeforgeTools = self.callPackage ./flakeforge-tools/default.nix { };
       };
     };
 }
